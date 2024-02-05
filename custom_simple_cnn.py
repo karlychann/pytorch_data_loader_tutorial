@@ -1,12 +1,8 @@
-import torch
 import torch.nn as nn
 from collections import OrderedDict
 
 class SimpleCNN(nn.Module):
-    def __init__(
-        self,
-        num_classes: int = 1000,
-    ) -> None:
+    def __init__(self, num_classes=1000):
         super(SimpleCNN, self).__init__()
         self.num_classes = num_classes
         self.model = nn.Sequential(OrderedDict([
@@ -19,5 +15,6 @@ class SimpleCNN(nn.Module):
             ('flatten', nn.Flatten()),
             ('fc', nn.Linear(288,num_classes)),
         ]))
+    
     def forward(self, x):
         return self.model(x)

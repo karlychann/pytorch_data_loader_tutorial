@@ -14,7 +14,7 @@ class VisionDataset(data.Dataset):
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
     ) -> None:
-        if isinstance(root, torch._six.string_classes):
+        if isinstance(root, str):
             root = os.path.expanduser(root)
         self.root = root
 

@@ -1,4 +1,4 @@
-### Section 1 - First, let's import everything we will be needing.
+### Section 1 - Imports and pytorch setup
 
 from __future__ import print_function, division
 import torch
@@ -14,11 +14,12 @@ import copy
 import os
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-from fine_tuning_config_file import *
+from fine_tuning_config import *
 from custom_loader import ImageFolder as CustomLoader
+from custom_hymenoptera_dataset import HymenopteraDataset
 from custom_simple_cnn import SimpleCNN
-## If you want to keep a track of your network on tensorboard, set USE_TENSORBOARD TO 1 in config file.
 
+## If you want to keep a track of your network on tensorboard, set USE_TENSORBOARD TO 1 in config file.
 if USE_TENSORBOARD:
     from pycrayon import CrayonClient
     cc = CrayonClient(hostname=TENSORBOARD_SERVER)
@@ -30,12 +31,10 @@ if USE_TENSORBOARD:
 
 
 ## If you want to use the GPU, set GPU_MODE TO 1 in config file
-
 use_gpu = GPU_MODE
 if use_gpu:
     torch.cuda.set_device(CUDA_DEVICE)
 
-count=0
 
 ### SECTION 2 - data loading and shuffling/augmentation/normalization : all handled by torch automatically.
 
@@ -71,7 +70,6 @@ data_transforms = {
 }
 
 
-
 # Enter the absolute path of the dataset folder below. Keep in mind that this code expects data to be in same format as Imagenet. I encourage you to
 # use your own dataset. In that case you need to organize your data such that your dataset folder has EXACTLY two folders. Name these 'train' and 'val'
 # Yes, this is case sensitive. The 'train' folder contains training set and 'val' fodler contains validation set on which accuracy is measured.
@@ -104,30 +102,26 @@ data_transforms = {
 
 data_dir = DATA_DIR
 
-##################
-# MODIFIED: Added
-##################
-dsets = {x: CustomLoader(os.path.join(data_dir, x), data_transforms[x])
-         for x in ['train', 'val']}
 
 ##################
-# MODIFIED: Added
+# ADDED: custom torch Datasets for train and val
 ##################
-#dsets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x])
-         for x in ['train', 'val']}
+dsets = {}
+for split in ['train', 'val']:
+    #dsets[split] = CustomLoader(os.path.join(data_dir, split), data_transforms[split])
+    dsets[split] = HymenopteraDataset(os.path.join(data_dir, split), data_transforms[split])
 
+dset_sizes = {split: len(dsets[split]) for split in ['train', 'val']}
 
-dset_loaders = {x: torch.utils.data.DataLoader(dsets[x], batch_size=BATCH_SIZE,
-                                               shuffle=True, num_workers=25)
-                for x in ['train', 'val']}
-dset_sizes = {x: len(dsets[x]) for x in ['train', 'val']}
-dset_classes = dsets['train'].classes
+# Define the dataloaders, using our dataset instances for train and val
+dset_loaders = {}
+for split in ['train', 'val']:
+    dset_loaders[split] = torch.utils.data.DataLoader(dsets[split], batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
 
 
 ### SECTION 3 : Writing the functions that do training and validation phase.
 
 # These functions basically do forward propogation, back propogation, loss calculation, update weights of model, and save best model!
-
 
 ## The below function will train the model. Here's a short basic outline -
 
@@ -253,17 +247,16 @@ def exp_lr_scheduler(optimizer, epoch, init_lr=BASE_LR, lr_decay_epoch=EPOCH_DEC
 
 ### SECTION 4 : DEFINING MODEL ARCHITECTURE.
 
-# We use Resnet18 here. If you have more computational power, feel free to swap it with Resnet50, Resnet100 or Resnet152.
-# Since we are doing fine-tuning, or transfer learning we will use the pretrained net weights. In the last line, the number of classes has been specified.
-# Set the number of classes in the config file by setting the right value for NUM_CLASSES.
-
 ##################
 # MODIFIED: Added
+# Set the number of classes in the config file by setting the right value for NUM_CLASSES.
 ##################
 model_ft = SimpleCNN(num_classes=NUM_CLASSES)
 
 ##################
 # MODIFIED: Deleted
+# We use Resnet18 here. If you have more computational power, feel free to swap it with Resnet50, Resnet100 or Resnet152.
+# For fine tuning or transfer learning, we will use the pretrained net weights.
 ##################
 # model_ft = models.resnet18(pretrained=True)
 # num_ftrs = model_ft.fc.in_features
@@ -279,10 +272,9 @@ if use_gpu:
 optimizer_ft = optim.RMSprop(model_ft.parameters(), lr=0.0001)
 
 
-
 # Run the functions and save the best model in the function model_ft.
 model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=100)
+                       num_epochs=NUM_EPOCHS)
 
 # Save model
-model_ft.save_state_dict('fine_tuned_best_model.pt')
+torch.save(model_ft.state_dict(), 'fine_tuned_best_model.pt')
