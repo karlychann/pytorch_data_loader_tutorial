@@ -173,10 +173,11 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epochs=100):
 
                 if use_gpu:
                     try:
-                        inputs, labels = Variable(inputs.float().cuda()),
-                        Variable(labels.long().cuda())
-                    except:
-                        print(inputs,labels)
+                        inputs, labels = Variable(inputs.float().cuda()), Variable(labels.long().cuda())
+                    except Exception as e:
+                        print("ERROR! here are the inputs and labels before we print the full stack trace:")
+                        print(inputs, labels)
+                        raise e
                 else:
                     inputs, labels = Variable(inputs), Variable(labels)
 
