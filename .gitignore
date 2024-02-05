@@ -1,2 +1,5 @@
 *.pt
+*.p
+*.pkl
 __pycache__/
+biased_cars_1/

@@ -151,7 +151,10 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epochs=100):
     best_model = model
     best_acc = 0.0
 
+    accuracies = {'train': [], 'val': []}
+    losses = {'train': [], 'val': []}
     for epoch in range(num_epochs):
+        print('-' * 10)
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
 
@@ -198,33 +201,34 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epochs=100):
                 if phase == 'train':
                     loss.backward()
                     optimizer.step()
-                # print evaluation statistics
                 try:
                     running_loss += loss.item()
                     running_corrects += torch.sum(preds == labels.data)
                 except:
                     print('unexpected error, could not calculate loss or do a sum.')
-            print('trying epoch loss')
+
             epoch_loss = running_loss / dset_sizes[phase]
             epoch_acc = running_corrects.item() / float(dset_sizes[phase])
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(
-                phase, epoch_loss, epoch_acc))
+            print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+            accuracies[phase].append(epoch_acc)
+            losses[phase].append(epoch_loss)
 
             # deep copy the model
             if phase == 'val':
                 if USE_TENSORBOARD:
-                    foo.add_scalar_value('epoch_loss',epoch_loss,step=epoch)
-                    foo.add_scalar_value('epoch_acc',epoch_acc,step=epoch)
+                    foo.add_scalar_value('epoch_loss', epoch_loss,step=epoch)
+                    foo.add_scalar_value('epoch_acc', epoch_acc,step=epoch)
                 if epoch_acc > best_acc:
                     best_acc = epoch_acc
                     best_model = copy.deepcopy(model)
-                    print('new best accuracy = ',best_acc)
+                    print('new best accuracy =', best_acc)
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
     print('returning and looping back')
-    return best_model
+
+    return best_model, accuracies, losses
 
 
 # This function changes the learning rate as the model trains.
@@ -272,8 +276,11 @@ optimizer_ft = optim.RMSprop(model_ft.parameters(), lr=0.0001)
 
 
 # Run the functions and save the best model in the function model_ft.
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=NUM_EPOCHS)
+model_ft, accuracies, losses = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=NUM_EPOCHS)
+
+for split in ['train', 'val']:
+    print(split, "accuracies by epoch:", accuracies[split])
+    print(split, "losses by epoch:", losses[split])
 
 # Save model
 torch.save(model_ft.state_dict(), 'fine_tuned_best_model.pt')
