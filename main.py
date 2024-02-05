@@ -1,14 +1,11 @@
-### Section 1 - Imports and pytorch setup
+### SECTION 1 - Imports and pytorch setup
 
 from __future__ import print_function, division
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
-import numpy as np
-import torchvision
 from torchvision import datasets, models, transforms
-import matplotlib.pyplot as plt
 import time
 import copy
 import os
@@ -81,7 +78,7 @@ for split in ['train', 'val']:
 
 
 ##################
-# ImageFolder version
+# ImageFolder version of Dataset setup
     
 # ImageFolder is a built-in pytorch class that produces a Dataset instance without you having to define your own Dataset class. 
 # It only works if data is formatted in a specific way. 
@@ -127,7 +124,7 @@ for split in ['train', 'val']:
     dset_loaders[split] = torch.utils.data.DataLoader(dsets[split], batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
 
 
-### SECTION 3 : Writing the functions that do training and validation phase.
+### SECTION 3 - Writing the functions that do training and validation phase.
 
 # The code below does forward propogation, back propogation, loss calculation, update weights of model, and save the best model at the end!
 
@@ -246,7 +243,7 @@ def exp_lr_scheduler(optimizer, epoch, init_lr=BASE_LR, lr_decay_epoch=EPOCH_DEC
     return optimizer
 
 
-### SECTION 4 : DEFINING MODEL ARCHITECTURE.
+### SECTION 4 - DEFINING MODEL ARCHITECTURE.
 
 ##################
 # MODIFIED: Added

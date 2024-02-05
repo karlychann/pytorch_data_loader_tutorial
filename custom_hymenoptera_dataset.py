@@ -37,6 +37,8 @@ class HymenopteraDataset(Dataset):
           image_label_dict[filename] = img_class
           class_counts[self.class_dict[img_class]] += 1
           print("Image loaded:", filename)
+        else: 
+          print("Invalid file name: " + filename + " (should end with integer class id). Skipping this file...")
 
     # self.items is a list of tuples like: [ ("im1.jpg", 0), ("img2.png", 1), ... ]
     self.items = list(image_label_dict.items())
