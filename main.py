@@ -14,12 +14,11 @@ import copy
 import os
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-from fine_tuning_config import *
-from custom_loader import ImageFolder as CustomLoader
+from config import *
 from custom_hymenoptera_dataset import HymenopteraDataset
 from custom_simple_cnn import SimpleCNN
 
-## If you want to keep a track of your network on tensorboard, set USE_TENSORBOARD TO 1 in config file.
+## If you want to keep track of your network on tensorboard, set USE_TENSORBOARD to 1 in the config file (config.py).
 if USE_TENSORBOARD:
     from pycrayon import CrayonClient
     cc = CrayonClient(hostname=TENSORBOARD_SERVER)
@@ -38,22 +37,26 @@ if use_gpu:
 
 ### SECTION 2 - data loading and shuffling/augmentation/normalization : all handled by torch automatically.
 
-# This is a little hard to understand initially, so I'll explain in detail here!
+# Before being fed into the network during training, each image is transformed by undergoing augmentation and normalization.
+#    
+# Data augmentation is a strategy to reduce overfitting. Instead of just feeding the same images into the network epoch after epoch
+# until the network memorizes them, we feed a slightly perturbed version each time so it never sees exactly the same image more than once. 
+# For example (under data_transforms below):
+# 1. RandomSizedCrop takes a crop of an image at various scales between 0.08 to 0.8 times the size of the image, and then resizes it to 224x224
+# 2. RandomHorizontalFlip flips the image horizontally 50% of the time. For example, an image of a horse facing to the left would now be facing to the right.  
+#
+# ToTensor() converts each image from a PIL.Image into a torch.Tensor so it can be fed into pytorch models 
+#   
+# Normalize(means, standard_deviations) normalizes each channel (e.g., red green blue a.k.a. RGB) by the dataset's overall mean and standard deviation
+# for each of these three values. This allows the the network to receive input with consistent statistics, improving the mathematical stability of the 
+# network as it trains. In practice, it takes a long time to compute the exact mean and standard deviation of an entire dataset, so the values below
+# (which are the means and stdevs from a large, popular dataset called ImageNet) are used as defaults, and good enough in most cases.
+# The mean and standard deviation of photographs isn't going to change too much - but it might be important to recalculate these if you were working 
+# with a very different type of images (e.g., x-ray images).
+#
+# During validation (as opposed to training), we perform normalization but not augmentation - we want to test the network's performance on natural, 
+# unperturbed images. Resize() and CenterCrop() just deterministically ensure that we end up with a 224x224 image. 
 
-# For training, the data gets transformed by undergoing augmentation and normalization.
-# The RandomSizedCrop basically takes a crop of an image at various scales between 0.01 to 0.8 times the size of the image and resizes it to given number
-# Horizontal flip is a common technique in computer vision to augment the size of your data set. Firstly, it increases the number of times the network gets
-# to see the same thing, and secondly it adds rotational invariance to your networks learning.
-
-
-# Just normalization for validation, no augmentation.
-
-# You might be curious where these numbers came from? For the most part, they were used in popular architectures like the AlexNet paper.
-# It is important to normalize your dataset by calculating the mean and standard deviation of your dataset images and making your data unit normed. However,
-# it takes a lot of computation to do so, and some papers have shown that it doesn't matter too much if they are slightly off. So, people just use imagenet
-# dataset's mean and standard deviation to normalize their dataset approximately. These numbers are imagenet mean and standard deviation!
-
-# If you want to read more, transforms is a function from torchvision, and you can go read more here - http://pytorch.org/docs/master/torchvision/transforms.html
 data_transforms = {
     'train': transforms.Compose([
         transforms.RandomResizedCrop(224),
@@ -69,27 +72,38 @@ data_transforms = {
     ]),
 }
 
+##################
+# ADDED: custom torch Datasets for train and val
+##################
+dsets = {}
+for split in ['train', 'val']:
+    dsets[split] = HymenopteraDataset(os.path.join(DATA_DIR, split), data_transforms[split])
 
-# Enter the absolute path of the dataset folder below. Keep in mind that this code expects data to be in same format as Imagenet. I encourage you to
-# use your own dataset. In that case you need to organize your data such that your dataset folder has EXACTLY two folders. Name these 'train' and 'val'
-# Yes, this is case sensitive. The 'train' folder contains training set and 'val' fodler contains validation set on which accuracy is measured.
 
-# The structure within 'train' and 'val' folders will be the same. They both contain one folder per class. All the images of that class are inside the
-# folder named by class name.
+##################
+# ImageFolder version
+    
+# ImageFolder is a built-in pytorch class that produces a Dataset instance without you having to define your own Dataset class. 
+# It only works if data is formatted in a specific way. 
+    
+# You need to organize your data such that your dataset folder has EXACTLY two folders. Name these 'train' and 'val' (always lower-case)
+# The 'train' folder contains training set and 'val' fodler contains validation set on which accuracy is measured.
+
+# The structure within 'train' and 'val' folders will be the same. They both contain one folder per class. All the images of that class 
+# are inside the folder named by class name.
 
 # So basically, if your dataset has 3 classes and you're trying to classify between pictures of 1) dogs 2) cats and 3) humans,
-# say you name your dataset folder 'data_directory'. Then inside 'data_directory' will be 'train' and 'test'. Further, Inside 'train' will be
-# 3 folders - 'dogs', 'cats', 'humans'. All training images for dogs will be inside this 'dogs'. Similarly, within 'val' as well there will be the same
-# 3 folders.
+# say you name your dataset folder 'data_dir'. Then inside 'data_dir' will be 'train' and 'val'. Further, Inside 'train' will be
+# 3 folders - 'dogs', 'cats', 'humans'. All training images for dogs will be inside this 'dogs' folder. 
+# Similarly, within 'val' as well there will be the same 3 folders.
 
 ## So, the structure looks like this :
-# data_dar
+# data_dir
 #      |- train
 #            |- dogs
 #                 |- dog_image_1
 #                 |- dog_image_2
 #                        .....
-
 #            |- cats
 #                 |- cat_image_1
 #                 |- cat_image_1
@@ -99,17 +113,11 @@ data_transforms = {
 #            |- dogs
 #            |- cats
 #            |- humans
-
-data_dir = DATA_DIR
-
-
 ##################
-# ADDED: custom torch Datasets for train and val
-##################
-dsets = {}
-for split in ['train', 'val']:
-    #dsets[split] = CustomLoader(os.path.join(data_dir, split), data_transforms[split])
-    dsets[split] = HymenopteraDataset(os.path.join(data_dir, split), data_transforms[split])
+# dsets = {}
+# for split in ['train', 'val']:
+#    dsets[split] = datasets.ImageFolder(os.path.join(DATA_DIR, split), data_transforms[split])
+    
 
 dset_sizes = {split: len(dsets[split]) for split in ['train', 'val']}
 
@@ -121,24 +129,23 @@ for split in ['train', 'val']:
 
 ### SECTION 3 : Writing the functions that do training and validation phase.
 
-# These functions basically do forward propogation, back propogation, loss calculation, update weights of model, and save best model!
+# The code below does forward propogation, back propogation, loss calculation, update weights of model, and save the best model at the end!
 
-## The below function will train the model. Here's a short basic outline -
-
-# For the number of specified epoch's, the function goes through a train and a validation phase. Hence the nested for loop.
-
-# In both train and validation phase, the loaded data is forward propogated through the model (architecture defined ahead).
-# In PyTorch, the data loader is basically an iterator. so basically there's a get_element function which gets called everytime
-# the program iterates over data loader. So, basically, get_item on dset_loader below gives data, which contains 2 tensors - input and target.
-# target is the class number. Class numbers are assigned by going through the train/val folder and reading folder names in alphabetical order.
-# So in our case cats would be first, dogs second and humans third class.
-
-# Forward prop is as simple as calling model() function and passing in the input.
-
-# Variables are basically wrappers on top of PyTorch tensors and all that they do is keep a track of every process that tensor goes through.
-# The benefit of this is, that you don't need to write the equations for backpropogation, because the history of computations has been tracked
+# As a brief outline:
+#
+# For the number of specified epochs (in config.py), train_model goes through a training and a validation phase. 
+# Hence the nested for loop: an outer loop for multiple epochs, and an inner loop to iterate through batches of data from the dataloader. 
+#
+# In both training and validation phases, the loaded data is forward propogated through the model.
+# In PyTorch, the Dataloader is an iterator that wraps around a Dataset class. There's a __getitem__ function which gets called every
+# time the program iterates over the Dataloader - it fetches two tensors, inputs (the images) and labels (which are integers).
+# 
+# Forward prop is as simple as calling model() as a function and passing in the input.
+# 
+# The "Variable" class is like a wrappers on top of PyTorch Tensors that keeps track of every mathematical operation that tensor goes through.
+# The benefit of this is that you don't need to write the equations for backpropogation, because the history of computations has been tracked
 # and pytorch can automatically differentiate it! Thus, 2 things are SUPER important. ALWAYS check for these 2 things.
-# 1) NEVER overwrite a pytorch variable, as all previous history will be lost and autograd won't work.
+# 1) NEVER overwrite a pytorch variable, as all previous history will be lost and automatic differentation ("autograd") won't work.
 # 2) Variables can only undergo operations that are differentiable.
 
 def train_model(model, criterion, optimizer, lr_scheduler, num_epochs=100):
@@ -154,22 +161,19 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epochs=100):
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
             if phase == 'train':
-                mode='train'
                 optimizer = lr_scheduler(optimizer, epoch)
                 model.train()  # Set model to training mode
             else:
-                model.eval()
-                mode='val'
+                model.eval()  # Set model to eval mode for validation (no need to track gradients)
 
             running_loss = 0.0
             running_corrects = 0
 
             counter=0
-            # Iterate over data.
+            # Iterate over data, getting one batch of inputs (images) and labels each time.
             for data in dset_loaders[phase]:
                 inputs, labels = data
-                print(inputs.size())
-                # wrap them in Variable
+
                 if use_gpu:
                     try:
                         inputs, labels = Variable(inputs.float().cuda()),
@@ -185,27 +189,21 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epochs=100):
                 _, preds = torch.max(outputs.data, 1)
 
                 loss = criterion(outputs, labels)
-                # print('loss done')
-                # Just so that you can keep track that something's happening and don't feel like the program isn't running.
-                # if counter%10==0:
-                #     print("Reached iteration ",counter)
+
+                # Print a line every 10 batches so you have something to watch and don't feel like the program isn't running.
+                if counter%10==0:
+                    print("Reached batch iteration", counter)
+
                 counter+=1
 
                 # backward + optimize only if in training phase
                 if phase == 'train':
-                    # print('loss backward')
                     loss.backward()
-                    # print('done loss backward')
                     optimizer.step()
-                    # print('done optim')
                 # print evaluation statistics
                 try:
-                    # running_loss += loss.data[0]
                     running_loss += loss.item()
-                    # print(labels.data)
-                    # print(preds)
                     running_corrects += torch.sum(preds == labels.data)
-                    # print('running correct =',running_corrects)
                 except:
                     print('unexpected error, could not calculate loss or do a sum.')
             print('trying epoch loss')
@@ -213,7 +211,6 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epochs=100):
             epoch_acc = running_corrects.item() / float(dset_sizes[phase])
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
-
 
             # deep copy the model
             if phase == 'val':
@@ -231,7 +228,11 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epochs=100):
     print('returning and looping back')
     return best_model
 
-# This function changes the learning rate over the training model.
+
+# This function changes the learning rate as the model trains.
+# If the learning rate is too high, training tends to be unstable and it's harder to converge on an optimal set of weights. 
+# But, if learning rate is too low, learning is too slow and you won't converge in a reasonable time frame. A good compromise 
+# is to start out with a high learning rate and then reduce it over time. 
 def exp_lr_scheduler(optimizer, epoch, init_lr=BASE_LR, lr_decay_epoch=EPOCH_DECAY):
     """Decay learning rate by a factor of DECAY_WEIGHT every lr_decay_epoch epochs."""
     lr = init_lr * (DECAY_WEIGHT**(epoch // lr_decay_epoch))

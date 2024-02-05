@@ -38,9 +38,8 @@ class HymenopteraDataset(Dataset):
           class_counts[self.class_dict[img_class]] += 1
           print("Image loaded:", filename)
 
-    # self.items will look something like: [ ("im1.jpg", 0), ("img2.png", 1), ... ]
+    # self.items is a list of tuples like: [ ("im1.jpg", 0), ("img2.png", 1), ... ]
     self.items = list(image_label_dict.items())
-
     print("Class counts:", class_counts) 
     
 
@@ -50,7 +49,7 @@ class HymenopteraDataset(Dataset):
 
   def __getitem__(self, idx):
     img_path = os.path.join(self.img_dir, self.items[idx][0])
-    # image = torchvision.io.read_image(img_path)
+    # image = torchvision.io.read_image(img_path) # This version reads the image directly as a Tensor
     image = Image.open(img_path)
     label = self.items[idx][1]
 

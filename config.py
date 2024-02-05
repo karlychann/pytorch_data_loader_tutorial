@@ -1,11 +1,11 @@
 # TRAINING SETTINGS
-NUM_EPOCHS = 1
+NUM_EPOCHS = 3
 
 
 # LEARNING RATE SETTINGS
 BASE_LR = 0.001
-EPOCH_DECAY = 30 # number of epochs after which the Learning rate is decayed exponentially.
 DECAY_WEIGHT = 0.1 # factor by which the learning rate is reduced.
+EPOCH_DECAY = 30 # number of epochs after which the learning rate is decayed exponentially by DECAY_WEIGHT.
 
 
 # DATASET INFO
@@ -14,10 +14,10 @@ DATA_DIR = 'hymenoptera_data/' # to run with the sample dataset, just set to 'hy
 
 
 # DATALOADER PROPERTIES
-BATCH_SIZE = 10 # Set as high as possible. If you keep it too high, you'll get an out of memory error.
+BATCH_SIZE = 10
 
 
-### GPU SETTINGS
+# GPU SETTINGS
 CUDA_DEVICE = 0 # Enter device ID of your gpu if you want to run on gpu. Otherwise neglect.
 GPU_MODE = 0 # set to 1 if want to run on gpu.
 
